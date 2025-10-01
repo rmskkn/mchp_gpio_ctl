@@ -1,6 +1,7 @@
 use nusb::MaybeFuture;
 use std::thread::sleep;
 use std::time::Duration;
+use std::{env, process::Command};
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -134,6 +135,36 @@ fn main() {
             r#"SUBSYSTEMS=="usb", ATTRS{{idVendor}}=="{:04x}", ATTRS{{idProduct}}=="{:04x}", TAG+="uaccess", GROUP="plugdev", MODE="0660""#,
             VENDOR_FTDI, PRODUCT_FT234
         );
+
+        let group_check = Command::new("getent")
+            .arg("group")
+            .arg("plugdev")
+            .output()
+            .expect("Failed to run getent");
+
+        if !group_check.status.success() {
+            eprintln!(
+                "\n[!] 'plugdev' group does not exist.\n\
+                You can create it with:\n\n\
+                sudo groupadd plugdev\n"
+            );
+        }
+
+        let user = env::var("USER").unwrap_or_else(|_| "unknown".to_string());
+        let groups_check = Command::new("groups")
+            .arg(&user)
+            .output()
+            .expect("Failed to run groups command");
+
+        let stdout = String::from_utf8_lossy(&groups_check.stdout);
+        if !stdout.contains("plugdev") {
+            eprintln!(
+                "\n[!] User '{}' is NOT in the 'plugdev' group.\n\
+                You can add the user to the group with:\n\n\
+                sudo usermod -aG plugdev {}\n",
+                user, user
+            );
+        }
         return;
     }
 
